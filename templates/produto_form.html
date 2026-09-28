@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card border-0 shadow-sm p-4 col-md-8 mx-auto">
+    <h4 class="mb-4">Cadastrar Novo Produto</h4>
+    <form action="/produto/novo" method="POST">
+        <div class="mb-3">
+            <label class="form-label">Nome do Produto</label>
+            <input type="text" name="nome" class="form-control" required>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Tipo de Produto</label>
+                <select name="tipo" class="form-select" required>
+                    <option value="FISICO">Produto Físico</option>
+                    <option value="DIGITAL">Produto Digital</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Quantidade Inicial</label>
+                <input type="number" name="quantidade" class="form-control" value="0" min="0" required>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Preço de Custo (R$)</label>
+                <input type="number" step="0.01" name="preco_custo" class="form-control" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Preço Base de Venda (R$)</label>
+                <input type="number" step="0.01" name="preco_base_venda" class="form-control" required>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mt-4">
+            <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-success px-4">Salvar Produto</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

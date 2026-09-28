@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card bg-white border-0 shadow-sm p-3">
+            <h6 class="text-muted">Patrimônio Investido em Estoque</h6>
+            <h3 class="fw-bold text-primary">R$ {{ "%.2f"|format(patrimonio_total) }}</h3>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card bg-white border-0 shadow-sm p-3">
+            <h6 class="text-muted">Alertas de Reposição Crítica</h6>
+            <h3 class="fw-bold text-danger">{{ alertas_count }} Item(ns)</h3>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm p-4">
+    <h4 class="mb-3">Catálogo de Produtos</h4>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th>Qtd.</th>
+                    <th>Preço Venda</th>
+                    <th>Status Reposição</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produtos %}
+                <tr>
+                    <td>#{{ p.id_produto }}</td>
+                    <td class="fw-bold">{{ p.nome }}</td>
+                    <td>
+                        <span class="badge {% if p.__class__.__name__ == 'ProdutoFisico' %}bg-info{% else %}bg-purple{% endif %}">
+                            {{ p.__class__.__name__ }}
+                        </span>
+                    </td>
+                    <td>{{ p.quantidade }}</td>
+                    <td>R$ {{ "%.2f"|format(p.calcular_valor_venda()) }}</td>
+                    <td>
+                        {% if p.alerta_reposicao %}
+                            <span class="badge bg-danger">⚠️ Reposição Necessária</span>
+                        {% else %}
+                            <span class="badge bg-success">✅ Ok</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <!-- Botão de Movimentação (Saída / Entrada) -->
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#modalAjuste{{ p.id_produto }}">
+                            📊 Movimentar
+                        </button>
+
+                                {% if p.ativo %}
+                <!-- Botão de Inativar (Para produtos ativos) -->
+                <form action="/produto/inativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Inativar este produto do catálogo?');" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-outline-warning">🚫 Inativar</button>
+                </form>
+            {% else %}
+                <!-- Botão de Reativar (Para produtos inativos) -->
+                <form action="/produto/ativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Reativar este produto no catálogo?');" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-outline-success">✅ Ativar</button>
+                </form>
+            {% endif %}
+
+                        <!-- Modal (Janela) de Ajuste de Estoque -->
+                        <div class="modal fade" id="modalAjuste{{ p.id_produto }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <form action="/produto/ajustar_estoque/{{ p.id_produto }}" method="POST">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Movimentar Estoque - {{ p.nome }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-start">
+                                            <div class="mb-3">
+                                                <label class="form-label">Tipo de Movimentação</label>
+                                                <select name="operacao" class="form-select" required>
+                                                    <option value="SAIDA">Baixa / Venda (-)</option>
+                                                    <option value="ENTRADA">Entrada / Compra (+)</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Quantidade</label>
+                                                <input type="number" name="quantidade_ajuste" class="form-control" min="1" value="1" required>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-primary">Confirmar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">Nenhum produto cadastrado no momento.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
