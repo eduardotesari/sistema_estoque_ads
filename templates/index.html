@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="d-flex justify-content-end align-items-center mb-3">
+    <span class="me-3 text-muted small">Logado como: <strong>{{ session['username'] }}</strong></span>
+    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Sair</a>
+</div>
+
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card bg-white border-0 shadow-sm p-3">
@@ -56,17 +61,17 @@
                             📊 Movimentar
                         </button>
 
-                                {% if p.ativo %}
-                <!-- Botão de Inativar (Para produtos ativos) -->
-                <form action="/produto/inativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Inativar este produto do catálogo?');" style="display:inline;">
-                    <button type="submit" class="btn btn-sm btn-outline-warning">🚫 Inativar</button>
-                </form>
-            {% else %}
-                <!-- Botão de Reativar (Para produtos inativos) -->
-                <form action="/produto/ativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Reativar este produto no catálogo?');" style="display:inline;">
-                    <button type="submit" class="btn btn-sm btn-outline-success">✅ Ativar</button>
-                </form>
-            {% endif %}
+                        {% if p.ativo %}
+                            <!-- Botão de Inativar (Para produtos ativos) -->
+                            <form action="/produto/inativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Inativar este produto do catálogo?');" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-warning">🚫 Inativar</button>
+                            </form>
+                        {% else %}
+                            <!-- Botão de Reativar (Para produtos inativos) -->
+                            <form action="/produto/ativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Reativar este produto no catálogo?');" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-success">✅ Ativar</button>
+                            </form>
+                        {% endif %}
 
                         <!-- Modal (Janela) de Ajuste de Estoque -->
                         <div class="modal fade" id="modalAjuste{{ p.id_produto }}" tabindex="-1" aria-hidden="true">

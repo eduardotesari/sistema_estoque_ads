@@ -1,26 +1,18 @@
 import os
 import sqlite3
+from werkzeug.security import generate_password_hash
 
-# Nome do arquivo do banco de dados SQLite que será gerado automaticamente
 DATABASE_NAME = "stockcontrol.db"
 
 
 def get_connection():
-    """
-    Estabelece e retorna a conexão com o banco de dados SQLite.
-    A propriedade row_factory permite acessar as colunas pelo nome (ex: row['nome']).
-    """
     conn = sqlite3.connect(DATABASE_NAME)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    """
-    Inicializa o banco de dados executando o script SQL contido em Database/schema.sql.
-    """
-    # Caminho apontando para a pasta Database criada por você
-    schema_path = os.path.join("Database", "schema.sql")
+    schema_path = os.path.join("database", "schema.sql")
 
     if os.path.exists(schema_path):
         with open(schema_path, "r", encoding="utf-8") as f:
@@ -28,17 +20,23 @@ def init_db():
 
         conn = get_connection()
         conn.executescript(script)
+
+        # Cria o usuário padrão (admin / 1234) se não existir
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
+        if not cursor.fetchone():
+            senha_criptografada = generate_password_hash("1234")
+            cursor.execute(
+                "INSERT INTO usuarios (username, senha_hash) VALUES (?, ?)",
+                ("admin", senha_criptografada),
+            )
+
         conn.commit()
         conn.close()
-        print(
-            "✅ Banco de dados SQLite inicializado com sucesso em 'stockcontrol.db'!"
-        )
+        print("✅ Banco de dados e usuário padrão inicializados com sucesso!")
     else:
-        print(
-            f"⚠️ Arquivo '{schema_path}' não foi encontrado. Verifique a pasta Database."
-        )
+        print(f"⚠️ Arquivo '{schema_path}' não encontrado.")
 
 
 if __name__ == "__main__":
-    # Teste de execução direta no terminal do VS Code
     init_db()

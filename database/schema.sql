@@ -11,3 +11,9 @@ CREATE TABLE IF NOT EXISTS produtos (
     tamanho_mb REAL,
     ativo INTEGER NOT NULL DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    senha_hash TEXT NOT NULL
+);

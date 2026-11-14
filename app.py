@@ -1,13 +1,57 @@
-from flask import Flask, render_template, request, redirect, url_for
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, session
+from werkzeug.security import check_password_hash
 from database import get_connection, init_db
 from models import ProdutoFisico, ProdutoDigital
 
 app = Flask(__name__)
+app.secret_key = 'chave_secreta_stockcontrol_ads_anhanguera'
 
-# Garante que o banco e as tabelas corretas existem ao iniciar
+# Garante que o banco, as tabelas e o usuário admin existem ao iniciar
 init_db()
 
+
+# Decorador que exige login para acessar as páginas do sistema
+def login_obrigatorio(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    erro = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        senha = request.form.get('senha')
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, senha_hash FROM usuarios WHERE username = ?", (username,))
+        usuario = cursor.fetchone()
+        conn.close()
+
+        if usuario and check_password_hash(usuario['senha_hash'], senha):
+            session['usuario_id'] = usuario['id']
+            session['username'] = usuario['username']
+            return redirect(url_for('index'))
+        else:
+            erro = 'Usuário ou senha inválidos.'
+
+    return render_template('login.html', erro=erro)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
 @app.route('/')
+@login_obrigatorio
 def index():
     conn = get_connection()
     cursor = conn.cursor()
@@ -51,7 +95,9 @@ def index():
 
     return render_template('index.html', produtos=produtos, patrimonio_total=patrimonio_total, alertas_count=alertas_count)
 
+
 @app.route('/produto/novo', methods=['GET', 'POST'])
+@login_obrigatorio
 def novo_produto():
     if request.method == 'POST':
         nome = request.form.get('nome')
@@ -73,7 +119,9 @@ def novo_produto():
 
     return render_template('produto_form.html')
 
+
 @app.route('/produto/ajustar_estoque/<int:id_produto>', methods=['POST'])
+@login_obrigatorio
 def ajustar_estoque(id_produto):
     quantidade_ajuste = int(request.form.get('quantidade_ajuste', 0))
     operacao = request.form.get('operacao')
@@ -92,7 +140,9 @@ def ajustar_estoque(id_produto):
     conn.close()
     return redirect(url_for('index'))
 
+
 @app.route('/produto/inativar/<int:id_produto>', methods=['POST'])
+@login_obrigatorio
 def inativar_produto(id_produto):
     conn = get_connection()
     cursor = conn.cursor()
@@ -101,7 +151,9 @@ def inativar_produto(id_produto):
     conn.close()
     return redirect(url_for('index'))
 
+
 @app.route('/produto/ativar/<int:id_produto>', methods=['POST'])
+@login_obrigatorio
 def ativar_produto(id_produto):
     conn = get_connection()
     cursor = conn.cursor()
@@ -109,7 +161,10 @@ def ativar_produto(id_produto):
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
+
+
 @app.route('/produto/deletar/<int:id_produto>', methods=['POST'])
+@login_obrigatorio
 def deletar_produto(id_produto):
     conn = get_connection()
     cursor = conn.cursor()
@@ -117,5 +172,7 @@ def deletar_produto(id_produto):
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
