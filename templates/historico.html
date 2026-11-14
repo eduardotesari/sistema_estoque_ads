@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-0">Histórico de Movimentações</h3>
+        <small class="text-muted">Auditoria de entradas e retiradas do almoxarifado</small>
+    </div>
+    <div>
+        <a href="{{ url_for('index', categoria=categoria_filtro) }}" class="btn btn-outline-secondary btn-sm me-2">← Voltar ao Estoque</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Sair</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm p-4">
+    <!-- Filtro por Categoria -->
+    <div class="d-flex flex-wrap gap-1 mb-3">
+        <a href="{{ url_for('historico', categoria='Todas') }}"
+           class="btn btn-sm {% if categoria_filtro == 'Todas' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+           📦 Todas
+        </a>
+        {% for nome_cat, cfg in categorias_config.items() %}
+            <a href="{{ url_for('historico', categoria=nome_cat) }}"
+               class="btn btn-sm {% if categoria_filtro == nome_cat %}btn-{{ cfg.cor }} fw-bold{% else %}btn-outline-{{ cfg.cor }}{% endif %}">
+               {{ cfg.icone }} {{ nome_cat }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Data / Hora</th>
+                    <th>Operação</th>
+                    <th>Item</th>
+                    <th>Categoria</th>
+                    <th>Qtd.</th>
+                    <th>Responsável</th>
+                    <th>Observação / Setor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimentacoes %}
+                {% set cat_cfg = categorias_config.get(m['categoria'], {'cor': 'secondary', 'icone': '📎', 'texto': 'text-white'}) %}
+                <tr>
+                    <td class="text-muted small">{{ m['data_hora'] }}</td>
+                    <td>
+                        {% if m['operacao'] == 'ENTRADA' %}
+                            <span class="badge bg-success">⬆️ Entrada (+)</span>
+                        {% else %}
+                            <span class="badge bg-danger">⬇️ Saída (-)</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold">{{ m['produto_nome'] }}</td>
+                    <td>
+                        <span class="badge bg-{{ cat_cfg.cor }} {{ cat_cfg.texto }}">
+                            {{ cat_cfg.icone }} {{ m['categoria'] }}
+                        </span>
+                    </td>
+                    <td class="fw-bold">{{ m['quantidade'] }}</td>
+                    <td><strong>{{ m['usuario'] }}</strong></td>
+                    <td class="text-muted">{{ m['observacao'] or '—' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">Nenhuma movimentação registrada até o momento.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -8,7 +9,6 @@ from models import ProdutoFisico, ProdutoDigital
 app = Flask(__name__)
 app.secret_key = 'chave_secreta_stockcontrol_ads_anhanguera'
 
-# Configuração central de categorias, cores Bootstrap e ícones
 CATEGORIAS_CONFIG = {
     'Escritório': {'cor': 'primary', 'icone': '📎', 'texto': 'text-white'},
     'Copa e Cozinha': {'cor': 'warning', 'icone': '☕', 'texto': 'text-dark'},
@@ -22,6 +22,15 @@ init_db()
 @app.context_processor
 def inject_categorias():
     return dict(categorias_config=CATEGORIAS_CONFIG)
+
+
+def registrar_movimentacao(cursor, produto_nome, categoria, operacao, quantidade, observacao=""):
+    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    usuario_logado = session.get('username', 'sistema')
+    cursor.execute("""
+        INSERT INTO movimentacoes (produto_nome, categoria, operacao, quantidade, usuario, observacao, data_hora)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (produto_nome, categoria, operacao, quantidade, usuario_logado, observacao.strip(), agora))
 
 
 def login_obrigatorio(f):
@@ -260,6 +269,10 @@ def novo_produto():
             INSERT INTO produtos (nome, categoria, tipo, quantidade, estoque_minimo, preco_custo, preco_base_venda, ativo)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
         """, (nome, categoria, tipo, quantidade, estoque_minimo, preco_custo, preco_base_venda))
+
+        if quantidade > 0:
+            registrar_movimentacao(cursor, nome, categoria, 'ENTRADA', quantidade, 'Saldo inicial no cadastro')
+
         conn.commit()
         conn.close()
 
@@ -274,20 +287,57 @@ def novo_produto():
 def ajustar_estoque(id_produto):
     quantidade_ajuste = int(request.form.get('quantidade_ajuste', 0))
     operacao = request.form.get('operacao')
+    observacao = request.form.get('observacao', '').strip()
+
+    # Bloqueia movimentação caso a observação esteja vazia
+    if not observacao:
+        return redirect(request.referrer or url_for('index'))
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT quantidade FROM produtos WHERE id = ?", (id_produto,))
+    cursor.execute("SELECT nome, categoria, quantidade FROM produtos WHERE id = ?", (id_produto,))
     row = cursor.fetchone()
 
-    if row:
+    if row and quantidade_ajuste > 0:
         qtd_atual = row['quantidade']
+        qtd_efetiva = min(qtd_atual, quantidade_ajuste) if operacao == 'SAIDA' else quantidade_ajuste
         nova_qtd = max(0, qtd_atual - quantidade_ajuste) if operacao == 'SAIDA' else qtd_atual + quantidade_ajuste
+
         cursor.execute("UPDATE produtos SET quantidade = ? WHERE id = ?", (nova_qtd, id_produto))
+        if qtd_efetiva > 0:
+            registrar_movimentacao(cursor, row['nome'], row['categoria'], operacao, qtd_efetiva, observacao)
         conn.commit()
 
     conn.close()
     return redirect(request.referrer or url_for('index'))
+
+
+@app.route('/historico')
+@login_obrigatorio
+def historico():
+    categoria_filtro = request.args.get('categoria', 'Todas')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if categoria_filtro and categoria_filtro != 'Todas':
+        cursor.execute(
+            "SELECT * FROM movimentacoes WHERE categoria = ? ORDER BY id DESC LIMIT 200",
+            (categoria_filtro,)
+        )
+    else:
+        cursor.execute("SELECT * FROM movimentacoes ORDER BY id DESC LIMIT 200")
+
+    movimentacoes = cursor.fetchall()
+    conn.close()
+
+    tema = CATEGORIAS_CONFIG.get(categoria_filtro, {'cor': 'primary', 'icone': '📦', 'texto': 'text-white'})
+    return render_template(
+        'historico.html',
+        movimentacoes=movimentacoes,
+        categoria_filtro=categoria_filtro,
+        tema=tema
+    )
 
 
 @app.route('/produto/inativar/<int:id_produto>', methods=['POST'])

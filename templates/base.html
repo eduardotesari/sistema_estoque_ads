@@ -10,6 +10,7 @@
 
     {% set cor_barra = tema.cor if tema is defined else 'primary' %}
     {% set navbar_tema = 'navbar-light' if cor_barra in ['warning', 'info'] else 'navbar-dark' %}
+    {% set cor_texto_nav = 'text-dark' if cor_barra in ['warning', 'info'] else 'text-white' %}
 
     <nav class="navbar navbar-expand-lg {{ navbar_tema }} bg-{{ cor_barra }} shadow-sm mb-4">
         <div class="container">
@@ -19,9 +20,10 @@
                     <span class="badge bg-white text-dark ms-2">{{ tema.icone }} {{ categoria_filtro }}</span>
                 {% endif %}
             </a>
-            <div class="d-flex">
-                <a href="{{ url_for('index') }}" class="nav-link {{ 'text-dark' if cor_barra in ['warning', 'info'] else 'text-white' }} me-3">Estoque</a>
-                <a href="{{ url_for('novo_produto', categoria=categoria_filtro if categoria_filtro is defined else 'Escritório') }}" class="nav-link {{ 'text-dark' if cor_barra in ['warning', 'info'] else 'text-white' }} fw-bold">+ Novo Item</a>
+            <div class="d-flex align-items-center">
+                <a href="{{ url_for('index') }}" class="nav-link {{ cor_texto_nav }} me-3">Estoque</a>
+                <a href="{{ url_for('historico', categoria=categoria_filtro if categoria_filtro is defined else 'Todas') }}" class="nav-link {{ cor_texto_nav }} me-3">📋 Histórico</a>
+                <a href="{{ url_for('novo_produto', categoria=categoria_filtro if categoria_filtro is defined else 'Escritório') }}" class="nav-link {{ cor_texto_nav }} fw-bold">+ Novo Item</a>
             </div>
         </div>
     </nav>

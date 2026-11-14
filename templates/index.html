@@ -3,6 +3,7 @@
 {% block content %}
 <div class="d-flex justify-content-end align-items-center mb-3">
     <span class="me-3 text-muted small">Logado como: <strong>{{ session['username'] }}</strong></span>
+    <a href="{{ url_for('historico', categoria=categoria_filtro) }}" class="btn btn-outline-{{ tema.cor }} btn-sm me-2">📋 Histórico</a>
     {% if session.get('perfil') == 'admin' %}
         <a href="{{ url_for('gerenciar_usuarios') }}" class="btn btn-outline-dark btn-sm me-2">👥 Gerenciar Usuários</a>
     {% endif %}
@@ -126,7 +127,7 @@
                             </form>
                         {% endif %}
 
-                        <!-- Modal de Ajuste de Estoque -->
+                        <!-- Modal de Ajuste de Estoque com Observação Obrigatória -->
                         <div class="modal fade" id="modalAjuste{{ p.id_produto }}" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
@@ -146,6 +147,10 @@
                                             <div class="mb-3">
                                                 <label class="form-label">Quantidade</label>
                                                 <input type="number" name="quantidade_ajuste" class="form-control" min="1" value="1" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Observação / Destino <span class="text-danger">*</span></label>
+                                                <input type="text" name="observacao" class="form-control" placeholder="Ex: Retirado para Recepção, Compra NF 123..." minlength="3" required>
                                             </div>
                                         </div>
                                         <div class="modal-footer">
