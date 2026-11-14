@@ -15,5 +15,6 @@ CREATE TABLE IF NOT EXISTS produtos (
 CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    senha_hash TEXT NOT NULL
+    senha_hash TEXT NOT NULL,
+    perfil TEXT NOT NULL DEFAULT 'operador'
 );

@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-0">Gerenciamento de Acessos</h3>
+        <small class="text-muted">Área restrita ao administrador (Root)</small>
+    </div>
+    <div>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm me-2">← Voltar ao Estoque</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Sair</a>
+    </div>
+</div>
+
+{% if mensagem %}
+    <div class="alert alert-{{ tipo_alerta }} alert-dismissible fade show" role="alert">
+        {{ mensagem }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Formulário de Novo Usuário -->
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-4">
+            <h5 class="mb-3">Cadastrar Novo Acesso</h5>
+            <form method="POST" action="{{ url_for('gerenciar_usuarios') }}">
+                <div class="mb-3">
+                    <label class="form-label">Nome de Usuário</label>
+                    <input type="text" name="username" class="form-control" placeholder="Ex: joao.silva" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Senha Inicial</label>
+                    <input type="password" name="senha" class="form-control" placeholder="Digite a senha" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Nível de Acesso</label>
+                    <select name="perfil" class="form-select">
+                        <option value="operador">Operador (Apenas Estoque)</option>
+                        <option value="admin">Administrador (Root)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">+ Criar Usuário</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Usuários Existentes -->
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm p-4">
+            <h5 class="mb-3">Usuários Cadastrados</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuário</th>
+                            <th>Perfil</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in usuarios %}
+                        <tr>
+                            <td>#{{ u['id'] }}</td>
+                            <td class="fw-bold">{{ u['username'] }}</td>
+                            <td>
+                                {% if u['perfil'] == 'admin' %}
+                                    <span class="badge bg-dark">Administrador (Root)</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Operador</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <!-- Botão Editar -->
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#modalEditarUser{{ u['id'] }}">
+                                    ✏️ Editar
+                                </button>
+
+                                <!-- Botão Excluir (bloqueado para o root principal 'admin' e para o próprio usuário logado) -->
+                                {% if u['username'] != 'admin' and u['id'] != session['usuario_id'] %}
+                                    <form action="{{ url_for('deletar_usuario', id_usuario=u['id']) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir o acesso de {{ u['username'] }}?');" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Excluir</button>
+                                    </form>
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Usuário protegido">🔒 Protegido</button>
+                                {% endif %}
+
+                                <!-- Modal de Edição -->
+                                <div class="modal fade" id="modalEditarUser{{ u['id'] }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <form action="{{ url_for('editar_usuario', id_usuario=u['id']) }}" method="POST">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Editar Acesso - {{ u['username'] }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Nome de Usuário</label>
+                                                        <input type="text" name="username" class="form-control" value="{{ u['username'] }}" {% if u['username'] == 'admin' %}readonly{% endif %} required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Nova Senha <small class="text-muted">(deixe em branco para manter a atual)</small></label>
+                                                        <input type="password" name="nova_senha" class="form-control" placeholder="Nova senha">
+                                                    </div>
+                                                    {% if u['username'] != 'admin' %}
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Nível de Acesso</label>
+                                                        <select name="perfil" class="form-select">
+                                                            <option value="operador" {% if u['perfil'] == 'operador' %}selected{% endif %}>Operador (Apenas Estoque)</option>
+                                                            <option value="admin" {% if u['perfil'] == 'admin' %}selected{% endif %}>Administrador (Root)</option>
+                                                        </select>
+                                                    </div>
+                                                    {% else %}
+                                                        <input type="hidden" name="perfil" value="admin">
+                                                    {% endif %}
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

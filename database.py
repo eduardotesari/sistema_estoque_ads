@@ -20,20 +20,28 @@ def init_db():
 
         conn = get_connection()
         conn.executescript(script)
-
-        # Cria o usuário padrão (admin / 1234) se não existir
         cursor = conn.cursor()
+
+        # Garante que a coluna 'perfil' exista mesmo em bancos já criados anteriormente
+        cursor.execute("PRAGMA table_info(usuarios)")
+        colunas = [col[1] for col in cursor.fetchall()]
+        if "perfil" not in colunas:
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN perfil TEXT NOT NULL DEFAULT 'operador'")
+
+        # Garante que o usuário 'admin' exista com perfil 'admin' (root)
         cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
         if not cursor.fetchone():
             senha_criptografada = generate_password_hash("1234")
             cursor.execute(
-                "INSERT INTO usuarios (username, senha_hash) VALUES (?, ?)",
-                ("admin", senha_criptografada),
+                "INSERT INTO usuarios (username, senha_hash, perfil) VALUES (?, ?, ?)",
+                ("admin", senha_criptografada, "admin"),
             )
+        else:
+            cursor.execute("UPDATE usuarios SET perfil = 'admin' WHERE username = 'admin'")
 
         conn.commit()
         conn.close()
-        print("✅ Banco de dados e usuário padrão inicializados com sucesso!")
+        print("✅ Banco de dados e perfil root inicializados com sucesso!")
     else:
         print(f"⚠️ Arquivo '{schema_path}' não encontrado.")
 

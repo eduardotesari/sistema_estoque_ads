@@ -1,6 +1,7 @@
+import sqlite3
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from database import get_connection, init_db
 from models import ProdutoFisico, ProdutoDigital
 
@@ -11,12 +12,22 @@ app.secret_key = 'chave_secreta_stockcontrol_ads_anhanguera'
 init_db()
 
 
-# Decorador que exige login para acessar as páginas do sistema
 def login_obrigatorio(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'usuario_id' not in session:
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_obrigatorio(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            return redirect(url_for('login'))
+        if session.get('perfil') != 'admin':
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -30,13 +41,14 @@ def login():
 
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, username, senha_hash FROM usuarios WHERE username = ?", (username,))
+        cursor.execute("SELECT id, username, senha_hash, perfil FROM usuarios WHERE username = ?", (username,))
         usuario = cursor.fetchone()
         conn.close()
 
         if usuario and check_password_hash(usuario['senha_hash'], senha):
             session['usuario_id'] = usuario['id']
             session['username'] = usuario['username']
+            session['perfil'] = usuario['perfil']
             return redirect(url_for('index'))
         else:
             erro = 'Usuário ou senha inválidos.'
@@ -49,6 +61,98 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+
+# --- ROTAS DE GERENCIAMENTO DE USUÁRIOS (ROOT) ---
+
+@app.route('/usuarios', methods=['GET', 'POST'])
+@admin_obrigatorio
+def gerenciar_usuarios():
+    mensagem = None
+    tipo_alerta = "success"
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        novo_username = request.form.get('username', '').strip()
+        nova_senha = request.form.get('senha', '')
+        perfil = request.form.get('perfil', 'operador')
+
+        if novo_username and nova_senha:
+            try:
+                senha_hash = generate_password_hash(nova_senha)
+                cursor.execute(
+                    "INSERT INTO usuarios (username, senha_hash, perfil) VALUES (?, ?, ?)",
+                    (novo_username, senha_hash, perfil)
+                )
+                conn.commit()
+                mensagem = f"Usuário '{novo_username}' criado com sucesso!"
+            except sqlite3.IntegrityError:
+                mensagem = f"Erro: o usuário '{novo_username}' já existe."
+                tipo_alerta = "danger"
+
+    cursor.execute("SELECT id, username, perfil FROM usuarios ORDER BY id ASC")
+    usuarios = cursor.fetchall()
+    conn.close()
+
+    return render_template('usuarios.html', usuarios=usuarios, mensagem=mensagem, tipo_alerta=tipo_alerta)
+
+
+@app.route('/usuarios/editar/<int:id_usuario>', methods=['POST'])
+@admin_obrigatorio
+def editar_usuario(id_usuario):
+    username = request.form.get('username', '').strip()
+    nova_senha = request.form.get('nova_senha', '')
+    perfil = request.form.get('perfil', 'operador')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Impede rebaixar ou renomear o root principal 'admin'
+    cursor.execute("SELECT username FROM usuarios WHERE id = ?", (id_usuario,))
+    alvo = cursor.fetchone()
+
+    if alvo:
+        if alvo['username'] == 'admin':
+            username = 'admin'
+            perfil = 'admin'
+
+        if nova_senha:
+            senha_hash = generate_password_hash(nova_senha)
+            cursor.execute(
+                "UPDATE usuarios SET username = ?, senha_hash = ?, perfil = ? WHERE id = ?",
+                (username, senha_hash, perfil, id_usuario)
+            )
+        else:
+            cursor.execute(
+                "UPDATE usuarios SET username = ?, perfil = ? WHERE id = ?",
+                (username, perfil, id_usuario)
+            )
+        conn.commit()
+
+    conn.close()
+    return redirect(url_for('gerenciar_usuarios'))
+
+
+@app.route('/usuarios/deletar/<int:id_usuario>', methods=['POST'])
+@admin_obrigatorio
+def deletar_usuario(id_usuario):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Protege o root principal 'admin' e impede autoexclusão
+    cursor.execute("SELECT username FROM usuarios WHERE id = ?", (id_usuario,))
+    alvo = cursor.fetchone()
+
+    if alvo and alvo['username'] != 'admin' and id_usuario != session.get('usuario_id'):
+        cursor.execute("DELETE FROM usuarios WHERE id = ?", (id_usuario,))
+        conn.commit()
+
+    conn.close()
+    return redirect(url_for('gerenciar_usuarios'))
+
+
+# --- ROTAS DO ESTOQUE ---
 
 @app.route('/')
 @login_obrigatorio
