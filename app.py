@@ -268,7 +268,7 @@ def ativar_produto(id_produto):
 
 
 @app.route('/produto/deletar/<int:id_produto>', methods=['POST'])
-@login_obrigatorio
+@admin_obrigatorio
 def deletar_produto(id_produto):
     conn = get_connection()
     cursor = conn.cursor()

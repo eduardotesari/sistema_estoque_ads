@@ -67,12 +67,19 @@
                         {% if p.ativo %}
                             <!-- Botão de Inativar (Para produtos ativos) -->
                             <form action="/produto/inativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Inativar este produto do catálogo?');" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-outline-warning">🚫 Inativar</button>
+                                <button type="submit" class="btn btn-sm btn-outline-warning me-1">🚫 Inativar</button>
                             </form>
                         {% else %}
                             <!-- Botão de Reativar (Para produtos inativos) -->
                             <form action="/produto/ativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Reativar este produto no catálogo?');" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-outline-success">✅ Ativar</button>
+                                <button type="submit" class="btn btn-sm btn-outline-success me-1">✅ Ativar</button>
+                            </form>
+                        {% endif %}
+
+                        <!-- Botão de Excluir Permanentemente (Exclusivo para Admin / Root) -->
+                        {% if session.get('perfil') == 'admin' %}
+                            <form action="/produto/deletar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('ATENÇÃO: Deseja excluir permanentemente o produto {{ p.nome }} do banco de dados?');" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Excluir</button>
                             </form>
                         {% endif %}
 
