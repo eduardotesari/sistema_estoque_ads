@@ -12,7 +12,7 @@
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card bg-white border-0 shadow-sm p-3">
-            <h6 class="text-muted">Patrimônio Investido em Estoque</h6>
+            <h6 class="text-muted">Patrimônio Investido em Estoque {% if categoria_filtro != 'Todas' %}({{ categoria_filtro }}){% endif %}</h6>
             <h3 class="fw-bold text-primary">R$ {{ "%.2f"|format(patrimonio_total) }}</h3>
         </div>
     </div>
@@ -25,16 +25,49 @@
 </div>
 
 <div class="card border-0 shadow-sm p-4">
-    <h4 class="mb-3">Catálogo de Produtos</h4>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h4 class="mb-0">Catálogo de Materiais e Insumos</h4>
+        <a href="{{ url_for('novo_produto') }}" class="btn btn-primary btn-sm">+ Novo Item</a>
+    </div>
+
+    <!-- Barra de Filtros por Categoria e Busca -->
+    <div class="row g-2 mb-3 align-items-center">
+        <div class="col-md-8">
+            <div class="btn-group flex-wrap" role="group">
+                <a href="{{ url_for('index', categoria='Todas', busca=busca) }}"
+                   class="btn btn-sm {% if categoria_filtro == 'Todas' %}btn-dark{% else %}btn-outline-secondary{% endif %}">
+                   Todas
+                </a>
+                {% for cat in categorias %}
+                    <a href="{{ url_for('index', categoria=cat, busca=busca) }}"
+                       class="btn btn-sm {% if categoria_filtro == cat %}btn-dark{% else %}btn-outline-secondary{% endif %}">
+                       {{ cat }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-md-4">
+            <form method="GET" action="{{ url_for('index') }}" class="d-flex">
+                <input type="hidden" name="categoria" value="{{ categoria_filtro }}">
+                <input type="text" name="busca" class="form-control form-control-sm me-2" placeholder="Buscar item..." value="{{ busca }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Buscar</button>
+                {% if busca %}
+                    <a href="{{ url_for('index', categoria=categoria_filtro) }}" class="btn btn-sm btn-outline-secondary ms-1">✕</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover align-middle">
             <thead class="table-light">
                 <tr>
                     <th>ID</th>
-                    <th>Nome</th>
+                    <th>Item</th>
+                    <th>Categoria</th>
                     <th>Tipo</th>
                     <th>Qtd.</th>
-                    <th>Preço Venda</th>
+                    <th>Custo Unit.</th>
                     <th>Status Reposição</th>
                     <th class="text-center">Ações</th>
                 </tr>
@@ -45,15 +78,26 @@
                     <td>#{{ p.id_produto }}</td>
                     <td class="fw-bold">{{ p.nome }}</td>
                     <td>
-                        <span class="badge {% if p.__class__.__name__ == 'ProdutoFisico' %}bg-info{% else %}bg-purple{% endif %}">
-                            {{ p.__class__.__name__ }}
+                        {% if p.categoria == 'TI' %}
+                            <span class="badge bg-primary">💻 TI</span>
+                        {% elif p.categoria == 'Copa e Cozinha' %}
+                            <span class="badge bg-warning text-dark">☕ Copa e Cozinha</span>
+                        {% elif p.categoria == 'Limpeza' %}
+                            <span class="badge bg-info text-dark">🧼 Limpeza</span>
+                        {% else %}
+                            <span class="badge bg-secondary">📎 {{ p.categoria }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if p.__class__.__name__ == 'ProdutoFisico' %}bg-light text-dark border{% else %}bg-dark{% endif %}">
+                            {{ 'Físico' if p.__class__.__name__ == 'ProdutoFisico' else 'Digital' }}
                         </span>
                     </td>
-                    <td>{{ p.quantidade }}</td>
-                    <td>R$ {{ "%.2f"|format(p.calcular_valor_venda()) }}</td>
+                    <td class="fw-bold">{{ p.quantidade }}</td>
+                    <td>R$ {{ "%.2f"|format(p._preco_custo) }}</td>
                     <td>
                         {% if p.alerta_reposicao %}
-                            <span class="badge bg-danger">⚠️ Reposição Necessária</span>
+                            <span class="badge bg-danger">⚠️ Repor (Mín: {{ p._estoque_minimo }})</span>
                         {% else %}
                             <span class="badge bg-success">✅ Ok</span>
                         {% endif %}
@@ -65,25 +109,22 @@
                         </button>
 
                         {% if p.ativo %}
-                            <!-- Botão de Inativar (Para produtos ativos) -->
-                            <form action="/produto/inativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Inativar este produto do catálogo?');" style="display:inline;">
+                            <form action="/produto/inativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Inativar este item do catálogo?');" style="display:inline;">
                                 <button type="submit" class="btn btn-sm btn-outline-warning me-1">🚫 Inativar</button>
                             </form>
                         {% else %}
-                            <!-- Botão de Reativar (Para produtos inativos) -->
-                            <form action="/produto/ativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Reativar este produto no catálogo?');" style="display:inline;">
+                            <form action="/produto/ativar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('Reativar este item no catálogo?');" style="display:inline;">
                                 <button type="submit" class="btn btn-sm btn-outline-success me-1">✅ Ativar</button>
                             </form>
                         {% endif %}
 
-                        <!-- Botão de Excluir Permanentemente (Exclusivo para Admin / Root) -->
                         {% if session.get('perfil') == 'admin' %}
-                            <form action="/produto/deletar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('ATENÇÃO: Deseja excluir permanentemente o produto {{ p.nome }} do banco de dados?');" style="display:inline;">
+                            <form action="/produto/deletar/{{ p.id_produto }}" method="POST" onsubmit="return confirm('ATENÇÃO: Deseja excluir permanentemente {{ p.nome }}?');" style="display:inline;">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Excluir</button>
                             </form>
                         {% endif %}
 
-                        <!-- Modal (Janela) de Ajuste de Estoque -->
+                        <!-- Modal de Ajuste de Estoque -->
                         <div class="modal fade" id="modalAjuste{{ p.id_produto }}" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
@@ -96,7 +137,7 @@
                                             <div class="mb-3">
                                                 <label class="form-label">Tipo de Movimentação</label>
                                                 <select name="operacao" class="form-select" required>
-                                                    <option value="SAIDA">Baixa / Venda (-)</option>
+                                                    <option value="SAIDA">Baixa / Retirada (-)</option>
                                                     <option value="ENTRADA">Entrada / Compra (+)</option>
                                                 </select>
                                             </div>
@@ -117,7 +158,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-4 text-muted">Nenhum produto cadastrado no momento.</td>
+                    <td colspan="8" class="text-center py-4 text-muted">Nenhum item encontrado para este filtro.</td>
                 </tr>
                 {% endfor %}
             </tbody>

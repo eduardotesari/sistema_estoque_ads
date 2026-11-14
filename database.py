@@ -22,11 +22,17 @@ def init_db():
         conn.executescript(script)
         cursor = conn.cursor()
 
-        # Garante que a coluna 'perfil' exista mesmo em bancos já criados anteriormente
+        # Garante que a coluna 'perfil' exista na tabela usuarios
         cursor.execute("PRAGMA table_info(usuarios)")
-        colunas = [col[1] for col in cursor.fetchall()]
-        if "perfil" not in colunas:
+        colunas_usuarios = [col[1] for col in cursor.fetchall()]
+        if "perfil" not in colunas_usuarios:
             cursor.execute("ALTER TABLE usuarios ADD COLUMN perfil TEXT NOT NULL DEFAULT 'operador'")
+
+        # Garante que a coluna 'categoria' exista na tabela produtos
+        cursor.execute("PRAGMA table_info(produtos)")
+        colunas_produtos = [col[1] for col in cursor.fetchall()]
+        if "categoria" not in colunas_produtos:
+            cursor.execute("ALTER TABLE produtos ADD COLUMN categoria TEXT NOT NULL DEFAULT 'Escritório'")
 
         # Garante que o usuário 'admin' exista com perfil 'admin' (root)
         cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
@@ -41,7 +47,7 @@ def init_db():
 
         conn.commit()
         conn.close()
-        print("✅ Banco de dados e perfil root inicializados com sucesso!")
+        print("✅ Banco de dados, categorias e perfil root inicializados com sucesso!")
     else:
         print(f"⚠️ Arquivo '{schema_path}' não encontrado.")
 

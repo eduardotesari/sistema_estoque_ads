@@ -2,13 +2,14 @@ CREATE TABLE IF NOT EXISTS produtos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL,
     tipo TEXT NOT NULL,
-    preco_custo REAL NOT NULL,
-    preco_base_venda REAL NOT NULL,
+    categoria TEXT NOT NULL DEFAULT 'Escritório',
     quantidade INTEGER NOT NULL DEFAULT 0,
-    peso_kg REAL,
+    preco_custo REAL NOT NULL DEFAULT 0.0,
+    preco_base_venda REAL NOT NULL DEFAULT 0.0,
+    peso_kg REAL DEFAULT 1.0,
     estoque_minimo INTEGER DEFAULT 5,
     link_download TEXT,
-    tamanho_mb REAL,
+    tamanho_mb REAL DEFAULT 0.0,
     ativo INTEGER NOT NULL DEFAULT 1
 );
 

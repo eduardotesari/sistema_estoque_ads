@@ -8,7 +8,8 @@ from models import ProdutoFisico, ProdutoDigital
 app = Flask(__name__)
 app.secret_key = 'chave_secreta_stockcontrol_ads_anhanguera'
 
-# Garante que o banco, as tabelas e o usuário admin existem ao iniciar
+CATEGORIAS_PERMITIDAS = ['Escritório', 'Copa e Cozinha', 'Limpeza', 'TI']
+
 init_db()
 
 
@@ -108,7 +109,6 @@ def editar_usuario(id_usuario):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Impede rebaixar ou renomear o root principal 'admin'
     cursor.execute("SELECT username FROM usuarios WHERE id = ?", (id_usuario,))
     alvo = cursor.fetchone()
 
@@ -140,7 +140,6 @@ def deletar_usuario(id_usuario):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Protege o root principal 'admin' e impede autoexclusão
     cursor.execute("SELECT username FROM usuarios WHERE id = ?", (id_usuario,))
     alvo = cursor.fetchone()
 
@@ -157,9 +156,25 @@ def deletar_usuario(id_usuario):
 @app.route('/')
 @login_obrigatorio
 def index():
+    categoria_filtro = request.args.get('categoria', 'Todas')
+    busca = request.args.get('busca', '').strip()
+
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM produtos")
+
+    query = "SELECT * FROM produtos WHERE 1=1"
+    params = []
+
+    if categoria_filtro and categoria_filtro != 'Todas':
+        query += " AND categoria = ?"
+        params.append(categoria_filtro)
+
+    if busca:
+        query += " AND nome LIKE ?"
+        params.append(f"%{busca}%")
+
+    query += " ORDER BY categoria ASC, nome ASC"
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
 
@@ -191,13 +206,24 @@ def index():
                 ativo=bool(r['ativo'])
             )
 
+        # Anexa a categoria ao objeto para exibição na tabela
+        p.categoria = r['categoria'] if 'categoria' in r.keys() and r['categoria'] else 'Escritório'
+
         produtos.append(p)
         patrimonio_total += p.quantidade * p._preco_custo
 
         if getattr(p, 'alerta_reposicao', False):
             alertas_count += 1
 
-    return render_template('index.html', produtos=produtos, patrimonio_total=patrimonio_total, alertas_count=alertas_count)
+    return render_template(
+        'index.html',
+        produtos=produtos,
+        patrimonio_total=patrimonio_total,
+        alertas_count=alertas_count,
+        categorias=CATEGORIAS_PERMITIDAS,
+        categoria_filtro=categoria_filtro,
+        busca=busca
+    )
 
 
 @app.route('/produto/novo', methods=['GET', 'POST'])
@@ -205,23 +231,25 @@ def index():
 def novo_produto():
     if request.method == 'POST':
         nome = request.form.get('nome')
-        tipo = request.form.get('tipo')
+        categoria = request.form.get('categoria', 'Escritório')
+        tipo = request.form.get('tipo', 'ProdutoFisico')
         quantidade = int(request.form.get('quantidade', 0))
+        estoque_minimo = int(request.form.get('estoque_minimo', 5))
         preco_custo = float(request.form.get('preco_custo', 0.0))
-        preco_base_venda = float(request.form.get('preco_base_venda', 0.0))
+        preco_base_venda = float(request.form.get('preco_base_venda', preco_custo))
 
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO produtos (nome, tipo, quantidade, preco_custo, preco_base_venda, ativo)
-            VALUES (?, ?, ?, ?, ?, 1)
-        """, (nome, tipo, quantidade, preco_custo, preco_base_venda))
+            INSERT INTO produtos (nome, categoria, tipo, quantidade, estoque_minimo, preco_custo, preco_base_venda, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """, (nome, categoria, tipo, quantidade, estoque_minimo, preco_custo, preco_base_venda))
         conn.commit()
         conn.close()
 
         return redirect(url_for('index'))
 
-    return render_template('produto_form.html')
+    return render_template('produto_form.html', categorias=CATEGORIAS_PERMITIDAS)
 
 
 @app.route('/produto/ajustar_estoque/<int:id_produto>', methods=['POST'])
