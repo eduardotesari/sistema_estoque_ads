@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <div>
         <h3 class="fw-bold mb-0">Histórico de Movimentações</h3>
         <small class="text-muted">Auditoria de entradas e retiradas do almoxarifado</small>
     </div>
-    <div>
-        <a href="{{ url_for('index', categoria=categoria_filtro) }}" class="btn btn-outline-secondary btn-sm me-2">← Voltar ao Estoque</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('exportar_historico', categoria=categoria_filtro) }}" class="btn btn-outline-secondary btn-sm">📥 Exportar Histórico (CSV)</a>
+        <a href="{{ url_for('index', categoria=categoria_filtro) }}" class="btn btn-outline-primary btn-sm">← Voltar ao Estoque</a>
         <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Sair</a>
     </div>
 </div>

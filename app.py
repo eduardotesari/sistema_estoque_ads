@@ -1,13 +1,17 @@
+import csv
+import io
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 from database import get_connection, init_db
 from models import ProdutoFisico, ProdutoDigital
 
 app = Flask(__name__)
 app.secret_key = 'chave_secreta_stockcontrol_ads_anhanguera'
+
+FUSO_BR = timezone(timedelta(hours=-3))
 
 CATEGORIAS_CONFIG = {
     'Escritório': {'cor': 'primary', 'icone': '📎', 'texto': 'text-white'},
@@ -24,8 +28,12 @@ def inject_categorias():
     return dict(categorias_config=CATEGORIAS_CONFIG)
 
 
+def agora_br():
+    return datetime.now(FUSO_BR)
+
+
 def registrar_movimentacao(cursor, produto_nome, categoria, operacao, quantidade, observacao=""):
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    agora = agora_br().strftime("%d/%m/%Y %H:%M")
     usuario_logado = session.get('username', 'sistema')
     cursor.execute("""
         INSERT INTO movimentacoes (produto_nome, categoria, operacao, quantidade, usuario, observacao, data_hora)
@@ -203,30 +211,31 @@ def index():
     alertas_count = 0
 
     for r in rows:
-        if r['tipo'] == 'ProdutoFisico':
+        item_dict = dict(r)
+        if item_dict['tipo'] == 'ProdutoFisico':
             p = ProdutoFisico(
-                id_produto=r['id'],
-                nome=r['nome'],
-                preco_custo=r['preco_custo'],
-                preco_base_venda=r['preco_base_venda'],
-                quantidade=r['quantidade'],
-                peso_kg=r['peso_kg'] or 1.0,
-                estoque_minimo=r['estoque_minimo'] or 5,
-                ativo=bool(r['ativo'])
+                id_produto=item_dict['id'],
+                nome=item_dict['nome'],
+                preco_custo=item_dict['preco_custo'],
+                preco_base_venda=item_dict['preco_base_venda'],
+                quantidade=item_dict['quantidade'],
+                peso_kg=item_dict.get('peso_kg') or 1.0,
+                estoque_minimo=item_dict.get('estoque_minimo') or 5,
+                ativo=bool(item_dict['ativo'])
             )
         else:
             p = ProdutoDigital(
-                id_produto=r['id'],
-                nome=r['nome'],
-                preco_custo=r['preco_custo'],
-                preco_base_venda=r['preco_base_venda'],
-                quantidade=r['quantidade'],
-                link_download=r['link_download'] or '',
-                tamanho_mb=r['tamanho_mb'] or 0.0,
-                ativo=bool(r['ativo'])
+                id_produto=item_dict['id'],
+                nome=item_dict['nome'],
+                preco_custo=item_dict['preco_custo'],
+                preco_base_venda=item_dict['preco_base_venda'],
+                quantidade=item_dict['quantidade'],
+                link_download=item_dict.get('link_download') or '',
+                tamanho_mb=item_dict.get('tamanho_mb') or 0.0,
+                ativo=bool(item_dict['ativo'])
             )
 
-        p.categoria = r['categoria'] if 'categoria' in r.keys() and r['categoria'] else 'Escritório'
+        p.categoria = item_dict.get('categoria') or 'Escritório'
 
         produtos.append(p)
         patrimonio_total += p.quantidade * p._preco_custo
@@ -282,14 +291,42 @@ def novo_produto():
     return render_template('produto_form.html', categoria_inicial=categoria_inicial, tema=tema)
 
 
-@app.route('/produto/ajustar_estoque/<int:id_produto>', methods=['POST'])
+@app.route('/produto/editar/<int:id_produto>', methods=['GET', 'POST'])
+@login_obrigatorio
+def editar_produto(id_produto):
+    if request.method == 'GET':
+        return redirect(url_for('index'))
+
+    nome = request.form.get('nome', '').strip()
+    categoria = request.form.get('categoria', 'Escritório')
+    estoque_minimo = int(request.form.get('estoque_minimo', 5))
+    preco_custo = float(request.form.get('preco_custo', 0.0))
+    preco_base_venda = float(request.form.get('preco_base_venda', preco_custo))
+
+    if nome:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE produtos
+            SET nome = ?, categoria = ?, estoque_minimo = ?, preco_custo = ?, preco_base_venda = ?
+            WHERE id = ?
+        """, (nome, categoria, estoque_minimo, preco_custo, preco_base_venda, id_produto))
+        conn.commit()
+        conn.close()
+
+    return redirect(request.referrer or url_for('index'))
+
+
+@app.route('/produto/ajustar_estoque/<int:id_produto>', methods=['GET', 'POST'])
 @login_obrigatorio
 def ajustar_estoque(id_produto):
+    if request.method == 'GET':
+        return redirect(url_for('index'))
+
     quantidade_ajuste = int(request.form.get('quantidade_ajuste', 0))
     operacao = request.form.get('operacao')
     observacao = request.form.get('observacao', '').strip()
 
-    # Bloqueia movimentação caso a observação esteja vazia
     if not observacao:
         return redirect(request.referrer or url_for('index'))
 
@@ -337,6 +374,104 @@ def historico():
         movimentacoes=movimentacoes,
         categoria_filtro=categoria_filtro,
         tema=tema
+    )
+
+
+# --- ROTA DE EXPORTAÇÃO CSV (SOMENTE DO HISTÓRICO, SEPARADO POR CATEGORIA) ---
+
+@app.route('/exportar/historico')
+@login_obrigatorio
+def exportar_historico():
+    categoria_filtro = request.args.get('categoria', '').strip()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=';', lineterminator='\r\n')
+
+    cabecalho = [
+        'Data e Hora',
+        'Operacao',
+        'Item',
+        'Categoria',
+        'Quantidade',
+        'Responsavel',
+        'Observacao / Destino'
+    ]
+
+    if categoria_filtro and categoria_filtro != 'Todas':
+        # Exporta apenas a categoria selecionada
+        cursor.execute(
+            "SELECT * FROM movimentacoes WHERE TRIM(categoria) = ? ORDER BY id DESC",
+            (categoria_filtro,)
+        )
+        rows = cursor.fetchall()
+
+        writer.writerow([f"RELATORIO DE MOVIMENTACOES - SETOR: {categoria_filtro.upper()}"])
+        writer.writerow(cabecalho)
+
+        for r in rows:
+            m = dict(r)
+            writer.writerow([
+                m.get('data_hora'),
+                m.get('operacao'),
+                m.get('produto_nome'),
+                m.get('categoria'),
+                m.get('quantidade'),
+                m.get('usuario'),
+                m.get('observacao') or ''
+            ])
+    else:
+        # Exporta TODAS já separadas em blocos por categoria
+        categoria_filtro = 'Todas'
+        cursor.execute("SELECT * FROM movimentacoes ORDER BY categoria ASC, id DESC")
+        rows = [dict(r) for r in cursor.fetchall()]
+
+        # Descobre todas as categorias presentes (mantendo a ordem principal primeiro)
+        categorias_presentes = list(CATEGORIAS_CONFIG.keys())
+        for m in rows:
+            cat_item = (m.get('categoria') or 'Sem Categoria').strip()
+            if cat_item not in categorias_presentes:
+                categorias_presentes.append(cat_item)
+
+        primeiro_bloco = True
+        for cat in categorias_presentes:
+            itens_cat = [m for m in rows if (m.get('categoria') or 'Sem Categoria').strip() == cat]
+            if not itens_cat:
+                continue
+
+            if not primeiro_bloco:
+                writer.writerow([])  # Linha em branco separando cada categoria
+            primeiro_bloco = False
+
+            writer.writerow([f"=== CATEGORIA: {cat.upper()} ==="])
+            writer.writerow(cabecalho)
+
+            for m in itens_cat:
+                writer.writerow([
+                    m.get('data_hora'),
+                    m.get('operacao'),
+                    m.get('produto_nome'),
+                    m.get('categoria'),
+                    m.get('quantidade'),
+                    m.get('usuario'),
+                    m.get('observacao') or ''
+                ])
+
+    conn.close()
+
+    conteudo_bytes = output.getvalue().encode('utf-8-sig')
+    nome_arquivo = f"historico_movimentacoes_{categoria_filtro.lower().replace(' ', '_')}_{agora_br().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return Response(
+        conteudo_bytes,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={nome_arquivo}",
+            "Content-Length": str(len(conteudo_bytes)),
+            "Cache-Control": "no-store"
+        }
     )
 
 
