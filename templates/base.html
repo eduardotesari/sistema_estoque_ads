@@ -3,37 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Estoque</title>
-    <!-- CSS Bootstrap 5 -->
+    <title>Controle de Estoque</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <!-- Navbar / Menu Superior -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm mb-4">
+
+    {% set cor_barra = tema.cor if tema is defined else 'primary' %}
+    {% set navbar_tema = 'navbar-light' if cor_barra in ['warning', 'info'] else 'navbar-dark' %}
+
+    <nav class="navbar navbar-expand-lg {{ navbar_tema }} bg-{{ cor_barra }} shadow-sm mb-4">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="/">📦 Sistema de Estoque</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/">Estoque</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link btn btn-success text-white ms-2 px-3" href="/produto/novo">+ Cadastrar Produto</a>
-                    </li>
-                </ul>
+            <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+                📦 Controle de Estoque
+                {% if categoria_filtro is defined and categoria_filtro != 'Todas' %}
+                    <span class="badge bg-white text-dark ms-2">{{ tema.icone }} {{ categoria_filtro }}</span>
+                {% endif %}
+            </a>
+            <div class="d-flex">
+                <a href="{{ url_for('index') }}" class="nav-link {{ 'text-dark' if cor_barra in ['warning', 'info'] else 'text-white' }} me-3">Estoque</a>
+                <a href="{{ url_for('novo_produto', categoria=categoria_filtro if categoria_filtro is defined else 'Escritório') }}" class="nav-link {{ 'text-dark' if cor_barra in ['warning', 'info'] else 'text-white' }} fw-bold">+ Novo Item</a>
             </div>
         </div>
     </nav>
 
-    <!-- Conteúdo Dinâmico -->
-    <div class="container">
+    <div class="container pb-5">
         {% block content %}{% endblock %}
     </div>
 
-    <!-- JS Bootstrap 5 -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

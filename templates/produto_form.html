@@ -1,43 +1,83 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card border-0 shadow-sm p-4 col-md-8 mx-auto">
-    <h4 class="mb-4">Cadastrar Novo Produto</h4>
-    <form action="/produto/novo" method="POST">
-        <div class="mb-3">
-            <label class="form-label">Nome do Produto</label>
-            <input type="text" name="nome" class="form-control" required>
-        </div>
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div id="cardCadastro" class="card border-0 border-top border-4 border-{{ tema.cor }} shadow-sm p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Cadastrar Novo Item</h4>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">Cancelar</a>
+            </div>
 
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Tipo de Produto</label>
-                <select name="tipo" class="form-select" required>
-                    <option value="FISICO">Produto Físico</option>
-                    <option value="DIGITAL">Produto Digital</option>
-                </select>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Quantidade Inicial</label>
-                <input type="number" name="quantidade" class="form-control" value="0" min="0" required>
-            </div>
-        </div>
+            <form method="POST" action="{{ url_for('novo_produto') }}">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome do Item</label>
+                    <input type="text" name="nome" class="form-control" placeholder="Ex: Mouse sem fio, Resma A4, Café 500g..." required autofocus>
+                </div>
 
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Preço de Custo (R$)</label>
-                <input type="number" step="0.01" name="preco_custo" class="form-control" required>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Preço Base de Venda (R$)</label>
-                <input type="number" step="0.01" name="preco_base_venda" class="form-control" required>
-            </div>
-        </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Categoria / Setor</label>
+                        <select name="categoria" id="selectCategoria" class="form-select border-{{ tema.cor }}" required onchange="atualizarCorCategoria()">
+                            {% for nome_cat, cfg in categorias_config.items() %}
+                                <option value="{{ nome_cat }}" data-cor="{{ cfg.cor }}" {% if nome_cat == categoria_inicial %}selected{% endif %}>
+                                    {{ cfg.icone }} {{ nome_cat }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-        <div class="d-flex justify-content-between mt-4">
-            <a href="/" class="btn btn-outline-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-success px-4">Salvar Produto</button>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Tipo de Produto</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="ProdutoFisico">Produto Físico</option>
+                            <option value="ProdutoDigital">Produto Digital (Licença/Software)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Quantidade Inicial</label>
+                        <input type="number" name="quantidade" class="form-control" min="0" value="1" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Estoque Mínimo (Alerta)</label>
+                        <input type="number" name="estoque_minimo" class="form-control" min="1" value="5" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Preço de Custo (R$)</label>
+                        <input type="number" step="0.01" name="preco_custo" class="form-control" min="0" placeholder="0.00" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Preço Base de Venda / Reposição (R$)</label>
+                        <input type="number" step="0.01" name="preco_base_venda" class="form-control" min="0" placeholder="0.00" required>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="submit" id="btnSalvarItem" class="btn btn-{{ tema.cor }} px-4">Salvar Produto</button>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
 </div>
+
+<script>
+function atualizarCorCategoria() {
+    const select = document.getElementById('selectCategoria');
+    const cor = select.options[select.selectedIndex].getAttribute('data-cor');
+    const btn = document.getElementById('btnSalvarItem');
+    const card = document.getElementById('cardCadastro');
+
+    btn.className = 'btn btn-' + cor + ' px-4';
+    card.className = 'card border-0 border-top border-4 border-' + cor + ' shadow-sm p-4';
+    select.className = 'form-select border-' + cor;
+}
+</script>
 {% endblock %}

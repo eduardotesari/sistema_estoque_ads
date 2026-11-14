@@ -8,9 +8,20 @@ from models import ProdutoFisico, ProdutoDigital
 app = Flask(__name__)
 app.secret_key = 'chave_secreta_stockcontrol_ads_anhanguera'
 
-CATEGORIAS_PERMITIDAS = ['Escritório', 'Copa e Cozinha', 'Limpeza', 'TI']
+# Configuração central de categorias, cores Bootstrap e ícones
+CATEGORIAS_CONFIG = {
+    'Escritório': {'cor': 'primary', 'icone': '📎', 'texto': 'text-white'},
+    'Copa e Cozinha': {'cor': 'warning', 'icone': '☕', 'texto': 'text-dark'},
+    'Limpeza': {'cor': 'info', 'icone': '🧼', 'texto': 'text-dark'},
+    'TI': {'cor': 'success', 'icone': '💻', 'texto': 'text-white'},
+}
 
 init_db()
+
+
+@app.context_processor
+def inject_categorias():
+    return dict(categorias_config=CATEGORIAS_CONFIG)
 
 
 def login_obrigatorio(f):
@@ -206,7 +217,6 @@ def index():
                 ativo=bool(r['ativo'])
             )
 
-        # Anexa a categoria ao objeto para exibição na tabela
         p.categoria = r['categoria'] if 'categoria' in r.keys() and r['categoria'] else 'Escritório'
 
         produtos.append(p)
@@ -215,20 +225,26 @@ def index():
         if getattr(p, 'alerta_reposicao', False):
             alertas_count += 1
 
+    tema = CATEGORIAS_CONFIG.get(categoria_filtro, {'cor': 'primary', 'icone': '📦', 'texto': 'text-white'})
+
     return render_template(
         'index.html',
         produtos=produtos,
         patrimonio_total=patrimonio_total,
         alertas_count=alertas_count,
-        categorias=CATEGORIAS_PERMITIDAS,
         categoria_filtro=categoria_filtro,
-        busca=busca
+        busca=busca,
+        tema=tema
     )
 
 
 @app.route('/produto/novo', methods=['GET', 'POST'])
 @login_obrigatorio
 def novo_produto():
+    categoria_inicial = request.args.get('categoria', 'Escritório')
+    if categoria_inicial not in CATEGORIAS_CONFIG:
+        categoria_inicial = 'Escritório'
+
     if request.method == 'POST':
         nome = request.form.get('nome')
         categoria = request.form.get('categoria', 'Escritório')
@@ -247,9 +263,10 @@ def novo_produto():
         conn.commit()
         conn.close()
 
-        return redirect(url_for('index'))
+        return redirect(url_for('index', categoria=categoria))
 
-    return render_template('produto_form.html', categorias=CATEGORIAS_PERMITIDAS)
+    tema = CATEGORIAS_CONFIG.get(categoria_inicial, {'cor': 'primary', 'icone': '📦', 'texto': 'text-white'})
+    return render_template('produto_form.html', categoria_inicial=categoria_inicial, tema=tema)
 
 
 @app.route('/produto/ajustar_estoque/<int:id_produto>', methods=['POST'])
@@ -270,7 +287,7 @@ def ajustar_estoque(id_produto):
         conn.commit()
 
     conn.close()
-    return redirect(url_for('index'))
+    return redirect(request.referrer or url_for('index'))
 
 
 @app.route('/produto/inativar/<int:id_produto>', methods=['POST'])
@@ -281,7 +298,7 @@ def inativar_produto(id_produto):
     cursor.execute("UPDATE produtos SET ativo = 0 WHERE id = ?", (id_produto,))
     conn.commit()
     conn.close()
-    return redirect(url_for('index'))
+    return redirect(request.referrer or url_for('index'))
 
 
 @app.route('/produto/ativar/<int:id_produto>', methods=['POST'])
@@ -292,7 +309,7 @@ def ativar_produto(id_produto):
     cursor.execute("UPDATE produtos SET ativo = 1 WHERE id = ?", (id_produto,))
     conn.commit()
     conn.close()
-    return redirect(url_for('index'))
+    return redirect(request.referrer or url_for('index'))
 
 
 @app.route('/produto/deletar/<int:id_produto>', methods=['POST'])
@@ -303,7 +320,7 @@ def deletar_produto(id_produto):
     cursor.execute("DELETE FROM produtos WHERE id = ?", (id_produto,))
     conn.commit()
     conn.close()
-    return redirect(url_for('index'))
+    return redirect(request.referrer or url_for('index'))
 
 
 if __name__ == '__main__':

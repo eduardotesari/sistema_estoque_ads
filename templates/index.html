@@ -11,13 +11,13 @@
 
 <div class="row mb-4">
     <div class="col-md-6">
-        <div class="card bg-white border-0 shadow-sm p-3">
-            <h6 class="text-muted">Patrimônio Investido em Estoque {% if categoria_filtro != 'Todas' %}({{ categoria_filtro }}){% endif %}</h6>
-            <h3 class="fw-bold text-primary">R$ {{ "%.2f"|format(patrimonio_total) }}</h3>
+        <div class="card bg-white border-0 border-start border-4 border-{{ tema.cor }} shadow-sm p-3">
+            <h6 class="text-muted">Patrimônio Investido {% if categoria_filtro != 'Todas' %}— {{ tema.icone }} {{ categoria_filtro }}{% endif %}</h6>
+            <h3 class="fw-bold text-{{ 'dark' if tema.cor == 'warning' else tema.cor }}">R$ {{ "%.2f"|format(patrimonio_total) }}</h3>
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card bg-white border-0 shadow-sm p-3">
+        <div class="card bg-white border-0 border-start border-4 border-danger shadow-sm p-3">
             <h6 class="text-muted">Alertas de Reposição Crítica</h6>
             <h3 class="fw-bold text-danger">{{ alertas_count }} Item(ns)</h3>
         </div>
@@ -26,22 +26,30 @@
 
 <div class="card border-0 shadow-sm p-4">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <h4 class="mb-0">Catálogo de Materiais e Insumos</h4>
-        <a href="{{ url_for('novo_produto') }}" class="btn btn-primary btn-sm">+ Novo Item</a>
+        <h4 class="mb-0">
+            Catálogo de Materiais
+            {% if categoria_filtro != 'Todas' %}
+                <span class="badge bg-{{ tema.cor }} {{ tema.texto }} ms-2">{{ tema.icone }} {{ categoria_filtro }}</span>
+            {% endif %}
+        </h4>
+        <a href="{{ url_for('novo_produto', categoria=categoria_filtro if categoria_filtro != 'Todas' else 'Escritório') }}"
+           class="btn btn-{{ tema.cor }} btn-sm fw-bold">
+           + Novo Item {% if categoria_filtro != 'Todas' %}em {{ categoria_filtro }}{% endif %}
+        </a>
     </div>
 
-    <!-- Barra de Filtros por Categoria e Busca -->
+    <!-- Barra de Filtros Coloridos por Categoria e Busca -->
     <div class="row g-2 mb-3 align-items-center">
         <div class="col-md-8">
-            <div class="btn-group flex-wrap" role="group">
+            <div class="d-flex flex-wrap gap-1" role="group">
                 <a href="{{ url_for('index', categoria='Todas', busca=busca) }}"
-                   class="btn btn-sm {% if categoria_filtro == 'Todas' %}btn-dark{% else %}btn-outline-secondary{% endif %}">
-                   Todas
+                   class="btn btn-sm {% if categoria_filtro == 'Todas' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+                   📦 Todas
                 </a>
-                {% for cat in categorias %}
-                    <a href="{{ url_for('index', categoria=cat, busca=busca) }}"
-                       class="btn btn-sm {% if categoria_filtro == cat %}btn-dark{% else %}btn-outline-secondary{% endif %}">
-                       {{ cat }}
+                {% for nome_cat, cfg in categorias_config.items() %}
+                    <a href="{{ url_for('index', categoria=nome_cat, busca=busca) }}"
+                       class="btn btn-sm {% if categoria_filtro == nome_cat %}btn-{{ cfg.cor }} fw-bold{% else %}btn-outline-{{ cfg.cor }}{% endif %}">
+                       {{ cfg.icone }} {{ nome_cat }}
                     </a>
                 {% endfor %}
             </div>
@@ -50,7 +58,7 @@
             <form method="GET" action="{{ url_for('index') }}" class="d-flex">
                 <input type="hidden" name="categoria" value="{{ categoria_filtro }}">
                 <input type="text" name="busca" class="form-control form-control-sm me-2" placeholder="Buscar item..." value="{{ busca }}">
-                <button type="submit" class="btn btn-sm btn-outline-primary">Buscar</button>
+                <button type="submit" class="btn btn-sm btn-{{ tema.cor }}">Buscar</button>
                 {% if busca %}
                     <a href="{{ url_for('index', categoria=categoria_filtro) }}" class="btn btn-sm btn-outline-secondary ms-1">✕</a>
                 {% endif %}
@@ -74,22 +82,17 @@
             </thead>
             <tbody>
                 {% for p in produtos %}
+                {% set cat_cfg = categorias_config.get(p.categoria, {'cor': 'secondary', 'icone': '📎', 'texto': 'text-white'}) %}
                 <tr>
                     <td>#{{ p.id_produto }}</td>
                     <td class="fw-bold">{{ p.nome }}</td>
                     <td>
-                        {% if p.categoria == 'TI' %}
-                            <span class="badge bg-primary">💻 TI</span>
-                        {% elif p.categoria == 'Copa e Cozinha' %}
-                            <span class="badge bg-warning text-dark">☕ Copa e Cozinha</span>
-                        {% elif p.categoria == 'Limpeza' %}
-                            <span class="badge bg-info text-dark">🧼 Limpeza</span>
-                        {% else %}
-                            <span class="badge bg-secondary">📎 {{ p.categoria }}</span>
-                        {% endif %}
+                        <span class="badge bg-{{ cat_cfg.cor }} {{ cat_cfg.texto }}">
+                            {{ cat_cfg.icone }} {{ p.categoria }}
+                        </span>
                     </td>
                     <td>
-                        <span class="badge {% if p.__class__.__name__ == 'ProdutoFisico' %}bg-light text-dark border{% else %}bg-dark{% endif %}">
+                        <span class="badge bg-light text-dark border">
                             {{ 'Físico' if p.__class__.__name__ == 'ProdutoFisico' else 'Digital' }}
                         </span>
                     </td>
@@ -103,8 +106,7 @@
                         {% endif %}
                     </td>
                     <td class="text-center">
-                        <!-- Botão de Movimentação (Saída / Entrada) -->
-                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#modalAjuste{{ p.id_produto }}">
+                        <button type="button" class="btn btn-sm btn-outline-{{ cat_cfg.cor }} me-1" data-bs-toggle="modal" data-bs-target="#modalAjuste{{ p.id_produto }}">
                             📊 Movimentar
                         </button>
 
@@ -129,8 +131,8 @@
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
                                     <form action="/produto/ajustar_estoque/{{ p.id_produto }}" method="POST">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Movimentar Estoque - {{ p.nome }}</h5>
+                                        <div class="modal-header bg-{{ cat_cfg.cor }} {{ cat_cfg.texto }}">
+                                            <h5 class="modal-title">{{ cat_cfg.icone }} Movimentar - {{ p.nome }}</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
                                         <div class="modal-body text-start">
@@ -148,7 +150,7 @@
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                            <button type="submit" class="btn btn-primary">Confirmar</button>
+                                            <button type="submit" class="btn btn-{{ cat_cfg.cor }}">Confirmar</button>
                                         </div>
                                     </form>
                                 </div>
